@@ -7,7 +7,24 @@
 - UDP 正确性：依赖 xray-core `#5030`（v25.8.29）的 origin UDP 修复，当前锁定的 `wyx2685/xray-core` fork 已包含。
 - 单进程即可覆盖任意多个 IP（inbound 监听 `0.0.0.0`，origin 按每条连接动态取入站 IP），**不需要多进程 / 多容器**，性能开销最小。
 
-## 一、拿到二进制（GitHub 自动 build，无需本地装 Go）
+## 一键安装（推荐）
+
+root 下一条命令搞定：自动装依赖、下载 origin 版、配置 systemd、生成 config、启动。
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/echoowall/ppanel-node/master/scripts/install-origin.sh) \
+  --api-host https://api.example.com --server-id 1 --secret-key 你的密钥
+```
+
+不带参数则进入交互式向导。**更新**：重新运行同一条命令即可（拉最新 origin 版、保留现有 config）。
+
+> ⚠️ 不要用 `ppnode update`——它会从官方仓库把二进制覆盖成非 origin 版。更新一律「重跑本脚本」。
+
+装完请看下方「上线前自检」确认多 IP 出站正常。
+
+---
+
+## 手动安装 —— 拿到二进制自行部署（GitHub 自动 build，无需本地装 Go）
 
 每次 build 会更新一个滚动 Release（tag `origin-latest`），下载 URL 固定不变，直接 wget：
 
