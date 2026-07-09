@@ -78,9 +78,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete origin-latest --cleanup-tag --yes 2>/dev/null || true
+          REPO="$GITHUB_REPOSITORY"
+          gh release delete origin-latest --repo "$REPO" --cleanup-tag --yes 2>/dev/null || true
           NOTES="Auto-built $(date -u '+%Y-%m-%d %H:%M UTC') from upstream \`$(git rev-parse --short upstream/master)\` with the sendThrough=origin patch (host-network multi-IP source-in-source-out; TCP/UDP)."
           gh release create origin-latest \
+            --repo "$REPO" \
             --title "ppnode (origin, rolling latest)" \
             --notes "$NOTES" \
             --latest \
