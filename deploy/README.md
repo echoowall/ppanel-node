@@ -9,12 +9,20 @@
 
 ## 一、拿到二进制（GitHub 自动 build，无需本地装 Go）
 
-1. 打开本仓库 **Actions** 页，如提示则先点 *Enable workflows*。
-2. 选 **Sync upstream and build (origin-enabled)** → **Run workflow**（也会每周一自动跑一次）。
-3. 跑完进入该次 run，底部 **Artifacts** 下载 `ppnode-linux-amd64-origin.tar.gz`。
-   - 内含：`ppnode` 二进制 + `geoip.dat` + `geosite.dat`。
+每次 build 会更新一个滚动 Release（tag `origin-latest`），下载 URL 固定不变，直接 wget：
 
-> 该 workflow 每次都会先合并上游（自动跟进 xray 内核 / 功能更新），再打上 origin 补丁编译；
+```bash
+# amd64（绝大多数服务器）
+wget https://github.com/echoowall/ppanel-node/releases/latest/download/ppnode-linux-amd64-origin.tar.gz
+# arm64
+wget https://github.com/echoowall/ppanel-node/releases/latest/download/ppnode-linux-arm64-origin.tar.gz
+```
+
+内含：`ppnode` 二进制 + `geoip.dat` + `geosite.dat`。
+
+手动触发一次构建：**Actions → Sync upstream and build (origin-enabled) → Run workflow**（每周一也会自动跑）。
+
+> 该 workflow 每次都会先合并上游（自动跟进 xray 内核 / 功能更新），再打上 origin 补丁编译并刷新 `origin-latest`；
 > 若上游改动与本补丁冲突，workflow 会失败并提示手动处理 `core/outbound/outbound.go`。
 
 ## 二、部署（systemd）
