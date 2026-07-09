@@ -13,8 +13,12 @@ func buildDefaultOutbound() (*core.OutboundHandlerConfig, error) {
 	outboundDetourConfig := &coreConf.OutboundDetourConfig{}
 	outboundDetourConfig.Protocol = "freedom"
 	outboundDetourConfig.Tag = DefaultTag
-	//sendthrough := "origin"
-	//outboundDetourConfig.SendThrough = &sendthrough
+	// Source-in-source-out: bind the outbound source IP to the local IP the
+	// client connected to (for host-network multi-IP servers). Relies on the
+	// xray-core "origin" sendThrough, whose UDP handling was fixed in
+	// xtls/xray-core#5030 (v25.8.29); the pinned fork already includes it.
+	sendthrough := "origin"
+	outboundDetourConfig.SendThrough = &sendthrough
 
 	proxySetting := &coreConf.FreedomConfig{
 		DomainStrategy: "UseIPv4v6",

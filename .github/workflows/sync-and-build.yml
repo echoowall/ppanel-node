@@ -1,0 +1,81 @@
+name: Sync upstream and build (origin-enabled)
+
+# Keeps this fork tracking perfect-panel/ppanel-node (so xray-core / feature
+# updates flow in automatically) and produces a linux/amd64 binary with the
+# source-in-source-out `sendThrough: origin` patch enabled.
+#
+# Trigger: weekly, or manually via the "Run workflow" button.
+
+on:
+  schedule:
+    - cron: "0 3 * * 1" # Mondays 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Merge upstream
+        run: |
+          git remote add upstream https://github.com/perfect-panel/ppanel-node.git
+          git fetch upstream
+          UP=$(git rev-parse upstream/master)
+          echo "upstream/master = $UP"
+          if git merge --no-edit "$UP"; then
+            git push origin HEAD:master
+          else
+            echo "::error::Merge conflict with upstream (likely core/outbound/outbound.go). Rebase the origin patch manually."
+            git merge --abort
+            exit 1
+          fi
+
+      - name: Ensure origin sendThrough is enabled (idempotent safeguard)
+        run: |
+          f=core/outbound/outbound.go
+          sed -i -E 's|^([[:space:]]*)//[[:space:]]*sendthrough := "origin"|\1sendthrough := "origin"|' "$f"
+          sed -i -E 's|^([[:space:]]*)//[[:space:]]*outboundDetourConfig\.SendThrough = &sendthrough|\1outboundDetourConfig.SendThrough = \&sendthrough|' "$f"
+          echo "---- effective outbound patch ----"
+          grep -nE 'sendthrough := "origin"|SendThrough = &sendthrough' "$f"
+          test "$(grep -c 'SendThrough = &sendthrough' "$f")" -ge 1
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.1"
+
+      - name: Build linux/amd64 (origin-enabled)
+        env:
+          CGO_ENABLED: "0"
+          GOOS: linux
+          GOARCH: amd64
+          GOEXPERIMENT: jsonv2
+        run: |
+          go mod download
+          go build -trimpath -ldflags "-s -w -buildid=" -o ppnode .
+          mkdir -p dist && cp ppnode dist/
+          for g in geoip geosite; do
+            curl -fsSL -o "dist/$g.dat" \
+              "https://raw.githubusercontent.com/Loyalsoldier/v2ray-rules-dat/release/$g.dat"
+          done
+          tar -C dist -czf ppnode-linux-amd64-origin.tar.gz .
+          ./ppnode --help >/dev/null 2>&1 || true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ppnode-linux-amd64-origin
+          path: ppnode-linux-amd64-origin.tar.gz
+          retention-days: 90
