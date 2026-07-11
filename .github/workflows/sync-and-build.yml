@@ -1,47 +1,29 @@
-name: Sync upstream and build (origin-enabled)
+name: Build and publish origin-latest
 
-# Keeps this fork tracking perfect-panel/ppanel-node (so xray-core / feature
-# updates flow in automatically) and publishes a linux binary with the
-# source-in-source-out `sendThrough: origin` patch enabled, as a rolling
-# GitHub Release (tag: origin-latest) for a stable download URL.
+# Builds a linux binary from THIS fork's master (carrying the source-in-source-out
+# `sendThrough: origin` patch plus the patched xray-core replace) and publishes it
+# as a rolling GitHub Release (tag: origin-latest) for a stable download URL.
 #
-# Trigger: weekly, or manually via the "Run workflow" button.
+# Automatic upstream merging is intentionally DISABLED: this fork carries
+# substantial patches (notably the xray-core splithttp per-connection local-addr
+# fix, without which XHTTP source-in-source-out collapses every entry IP onto one
+# address) that a blind weekly merge could clobber. Sync upstream manually and
+# re-verify the patches when desired.
+#
+# Trigger: manual only ("Run workflow").
 
 on:
-  schedule:
-    - cron: "0 3 * * 1" # Mondays 03:00 UTC
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  sync-and-build:
+  build-and-publish:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout fork
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Configure git
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Merge upstream
-        run: |
-          git remote add upstream https://github.com/perfect-panel/ppanel-node.git
-          git fetch upstream
-          UP=$(git rev-parse upstream/master)
-          echo "upstream/master = $UP"
-          if git merge --no-edit "$UP"; then
-            git push origin HEAD:master
-          else
-            echo "::error::Merge conflict with upstream (likely core/outbound/outbound.go). Rebase the origin patch manually."
-            git merge --abort
-            exit 1
-          fi
 
       - name: Ensure origin sendThrough is enabled (idempotent safeguard)
         run: |
@@ -51,6 +33,14 @@ jobs:
           echo "---- effective outbound patch ----"
           grep -nE 'sendthrough := "origin"|SendThrough = &sendthrough' "$f"
           test "$(grep -c 'SendThrough = &sendthrough' "$f")" -ge 1
+
+      - name: Ensure xray-core points at the patched fork (guard)
+        run: |
+          # The XHTTP source-in-source-out fix lives in the xray-core fork; refuse
+          # to publish a binary that would silently ship the unpatched upstream.
+          grep -qE 'replace github.com/xtls/xray-core .*=> github.com/echoowall/xray-core' go.mod \
+            || { echo "::error::go.mod is not replacing xray-core with echoowall/xray-core (XHTTP local-addr fix). Re-apply the replace before publishing."; exit 1; }
+          grep 'replace github.com/xtls/xray-core' go.mod
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -80,7 +70,7 @@ jobs:
         run: |
           REPO="$GITHUB_REPOSITORY"
           gh release delete origin-latest --repo "$REPO" --cleanup-tag --yes 2>/dev/null || true
-          NOTES="Auto-built $(date -u '+%Y-%m-%d %H:%M UTC') from upstream \`$(git rev-parse --short upstream/master)\` with the sendThrough=origin patch (host-network multi-IP source-in-source-out; TCP/UDP)."
+          NOTES="Built $(date -u '+%Y-%m-%d %H:%M UTC') from master \`$(git rev-parse --short HEAD)\` with sendThrough=origin + patched xray-core splithttp (host-network multi-IP source-in-source-out; TCP/UDP)."
           gh release create origin-latest \
             --repo "$REPO" \
             --title "ppnode (origin, rolling latest)" \
