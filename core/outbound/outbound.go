@@ -16,7 +16,13 @@ func buildDefaultOutbound() (*core.OutboundHandlerConfig, error) {
 	// Source-in-source-out: bind the outbound source IP to the local IP the
 	// client connected to (for host-network multi-IP servers). Relies on the
 	// xray-core "origin" sendThrough, whose UDP handling was fixed in
-	// xtls/xray-core#5030 (v25.8.29); the pinned fork already includes it.
+	// xtls/xray-core#5030 (v25.8.29).
+	//
+	// For XHTTP (splithttp) inbounds this also requires the xray-core fork to
+	// derive the connection's local address per-request (LocalAddrContextKey)
+	// rather than from the listener's wildcard address; without that fix a
+	// wildcard "[::]" listener collapses every entry IP onto one (often IPv6)
+	// source. The pinned echoowall/xray-core replace carries that patch.
 	sendthrough := "origin"
 	outboundDetourConfig.SendThrough = &sendthrough
 
