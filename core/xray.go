@@ -122,7 +122,12 @@ func getCore(c *conf.Conf, serverconfig *panel.ServerConfigResponse) *core.Insta
 		StatsUserUplink:   true,
 		StatsUserDownlink: true,
 		Handshake:         proto.Uint32(4),
-		ConnectionIdle:    proto.Uint32(30),
+		// ppnode lowered this to 30s, which xray's polling activity timer turns
+		// into a ~60s effective timeout, dropping idle-but-healthy long-lived
+		// connections (interactive SSH, database sessions, MQTT/WebSocket, etc.).
+		// Restore it to 120 — the value used by upstream wyx2685/v2node, which
+		// this project is modified from.
+		ConnectionIdle:    proto.Uint32(120),
 		UplinkOnly:        proto.Uint32(2),
 		DownlinkOnly:      proto.Uint32(4),
 		BufferSize:        proto.Int32(64),
