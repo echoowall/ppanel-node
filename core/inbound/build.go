@@ -146,5 +146,16 @@ func buildTransportSetting(nodeInfo *panel.NodeInfo) (*coreConf.StreamConfig, er
 	default:
 		return nil, errors.New("the network type is not vail")
 	}
+	// Server-side keep-alive: enable TCP keepalive on inbound (accepted)
+	// connections so the server itself emits periodic probes on idle,
+	// low-traffic connections (e.g. an idle SSH session). This resets the
+	// NAT/firewall idle timers on the client's path from the server side and
+	// keeps long-lived connections from being reaped after ~15-20s — with no
+	// client-side configuration required. Probe every 10s after 10s idle,
+	// which stays below common CGNAT/mobile idle timeouts.
+	stream.SocketSettings = &coreConf.SocketConfig{
+		TCPKeepAliveIdle:     10,
+		TCPKeepAliveInterval: 10,
+	}
 	return stream, nil
 }
