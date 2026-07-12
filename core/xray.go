@@ -122,7 +122,14 @@ func getCore(c *conf.Conf, serverconfig *panel.ServerConfigResponse) *core.Insta
 		StatsUserUplink:   true,
 		StatsUserDownlink: true,
 		Handshake:         proto.Uint32(4),
-		ConnectionIdle:    proto.Uint32(30),
+		// Idle-connection timeout. 30s was far too aggressive: it closed any
+		// low-traffic proxied connection (e.g. an idle interactive SSH session)
+		// after ~30s of no application data, which users saw as the proxy
+		// "dropping" long-lived connections. TCP keepalive only refreshes the
+		// socket, not this application-level timer. Raise it to 1h so idle
+		// sessions survive; genuinely dead peers are reaped by the sockopt TCP
+		// keepalive configured on the inbound/outbound.
+		ConnectionIdle:    proto.Uint32(3600),
 		UplinkOnly:        proto.Uint32(2),
 		DownlinkOnly:      proto.Uint32(4),
 		BufferSize:        proto.Int32(64),
